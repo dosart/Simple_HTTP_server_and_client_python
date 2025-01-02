@@ -1,51 +1,101 @@
 """
-Simple threaded blocking socket server.
+The simplest possible socket server (blocking).
 
-Changes:
-- use threads to avoid blocking (naively).
+Works only for one client.
+sock.recv() throws an exception on client disconnected.
 """
 
 import socket
-import threading
+
+from threading import Thread
+from typing import Tuple
+
+class Handler(Thread):
+    def __init__(self, client_socket: socket.socket):
+        """
+        Initialize a new handler thread.
+
+        :param client_socket: The socket of the client to serve.
+        """
+        super().__init__()
+        self.client_socket = client_socket
+    
+    def run(self) -> None:
+        """
+        Serve a client connection.
+        """
+        try:
+            while True:
+                data = self.client_socket.recv(1024)
+                if not data:
+                    break
+                print(f"Received: {data}")
+                message = "OK" 
+                self.client_socket.sendall(message.encode())
+        except socket.error as e:
+            print(f"Error serving client: {e}")
+        finally:
+            self.client_socket.close()
+
+class Server:
+    def __init__(self, host: str, port: int):
+        """
+        Initialize a new socket server.
+
+        :param host: The hostname or IP address to bind to.
+        :param port: The port number to listen on.
+        """
+        self.host = host
+        self.port = port
+
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(1)
+            print(f"Server started on {self.host}:{self.port}")
+        except OSError as e:
+            print(f"Error starting server: {e}")
+            self.server_socket.close()
+    
+    def accept_client(self) -> Tuple[socket.socket, Tuple[str, int]]:
+        """
+        Accept a new client connection.
+
+        :return: The connected socket and the address of the client.
+        """
+        try:
+            client_socket, client_address = self.server_socket.accept()
+            print(f"Connected by {client_address}")
+            return client_socket, client_address
+        except socket.error as e:
+            print(f"Error accepting client connection: {e}")
+            raise
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            raise
+    
+    def start(self) -> None:
+        """
+        Start the server.
+        """
+        try:
+            while True:
+                client_socket, client_address = self.accept_client()
+
+                thread = Handler(client_socket)
+                thread.start()
+
+        except KeyboardInterrupt:
+            print("Server stopped")
+        finally:
+            self.server_socket.close()
 
 
-def handle_connection(sock, addr):  # New
-    with sock:
-        print("Connected by", addr)
-        while True:
-            # Receive
-            try:
-                data = sock.recv(1024)
-            except ConnectionError:
-                print(f"Client suddenly closed while receiving")
-                break
-            print(f"Received: {data} from: {addr}")
-            if not data:
-                break
-            # Process
-            if data == b"close":
-                break
-            data = data.upper()
-            # Send
-            print(f"Send: {data} to: {addr}")
-            try:
-                sock.sendall(data)
-            except ConnectionError:
-                print(f"Client suddenly closed, cannot send")
-                break
-        print("Disconnected by", addr)
-
-
+# HOST = socket.gethostname()  # Make socket visible to outside world
+# HOST = "localhost"  # or "127.0.0.1" visible only within same machine
 HOST = ""  # Symbolic name meaning all available interfaces
 PORT = 50007  # Arbitrary non-privileged port
 
 if __name__ == "__main__":
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serv_sock:
-        serv_sock.bind((HOST, PORT))
-        serv_sock.listen(1)
-        print("Server started")
-        while True:
-            print("Waiting for connection...")
-            sock, addr = serv_sock.accept()
-            t = threading.Thread(target=handle_connection, args=(sock, addr))  # New
-            t.start()
+    server = Server(HOST, PORT)
+    server.start()
