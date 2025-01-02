@@ -6,6 +6,76 @@ sock.recv() throws an exception on client disconnected.
 """
 
 import socket
+from typing import Tuple
+
+class Server:
+    def __init__(self, host: str, port: int):
+        """
+        Initialize a new socket server.
+
+        :param host: The hostname or IP address to bind to.
+        :param port: The port number to listen on.
+        """
+        self.host = host
+        self.port = port
+
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(1)
+            print(f"Server started on {self.host}:{self.port}")
+        except OSError as e:
+            print(f"Error starting server: {e}")
+            self.server_socket.close()
+    
+    def accept_client(self) -> Tuple[socket.socket, Tuple[str, int]]:
+        """
+        Accept a new client connection.
+
+        :return: The connected socket and the address of the client.
+        """
+        try:
+            client_socket, client_address = self.server_socket.accept()
+            print(f"Connected by {client_address}")
+            return client_socket, client_address
+        except socket.error as e:
+            print(f"Error accepting client connection: {e}")
+            raise
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            raise
+    
+    def serve(self, client_socket: socket.socket) -> None:
+        """
+        Serve a client connection.
+
+        :param client_socket: The socket of the client to serve.
+        """
+        try:
+            while True:
+                data = client_socket.recv(1024)
+                if not data:
+                    break
+                print(f"Received: {data}")
+                message = "OK" 
+                client_socket.sendall(message.encode())
+        except socket.error as e:
+            print(f"Error serving client: {e}")
+        finally:
+            client_socket.close()
+    
+    def start(self) -> None:
+        """
+        Start the server.
+        """
+        try:
+            while True:
+                client_socket, client_address = self.accept_client()
+                self.serve(client_socket)
+        except KeyboardInterrupt:
+            print("Server stopped")
+        finally:
+            self.server_socket.close()
 
 
 # HOST = socket.gethostname()  # Make socket visible to outside world
@@ -14,32 +84,5 @@ HOST = ""  # Symbolic name meaning all available interfaces
 PORT = 50007  # Arbitrary non-privileged port
 
 if __name__ == "__main__":
-    # Create an INET, STREAMing socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serv_sock:
-        # Bind the socket to a public host, and a port client knows
-        serv_sock.bind((HOST, PORT))
-        # Become a server socket
-        # The argument means that only 1 connect request can wait to be accepted,
-        # all other will be refused. So, if you run 2 clients: the 1st will be
-        # accepted, the 2nd - waiting, and the 3rd - refused. The normal value is 5.
-        serv_sock.listen(1)
-        print("Server started")
-        print("Waiting for connection...")
-        sock, addr = serv_sock.accept()
-        with sock:
-            print("Connected by", addr)
-            while True:
-                # Receive
-                data = sock.recv(1024)
-                print(f"Received: {data} from: {addr}")
-                if not data:
-                    break
-                # Process
-                if data == b"close":
-                    break
-                data = data.upper()
-                # Send
-                print(f"Send: {data} to: {addr}")
-                sock.sendall(data)
-            print("Disconnected by", addr)
-            # sock.close()  # No need as wrapped with "with sock:"
+    server = Server(HOST, PORT)
+    server.start()
