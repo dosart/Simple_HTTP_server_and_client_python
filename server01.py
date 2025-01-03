@@ -1,8 +1,28 @@
 """
-The simplest possible socket server (blocking).
+A simple blocking socket server.
 
-Works only for one client.
-sock.recv() throws an exception on client disconnected.
+This server accepts a single client connection at a time and blocks
+while waiting for data from the client. When the client disconnects,
+sock.recv() throws an exception.
+
+Classes:
+    Server:
+        Manages the socket server operations, including accepting and serving
+        a client connection.
+
+Methods:
+    Server.__init__(self, host: str, port: int):
+        Initializes a new socket server with the specified host and port.
+    Server.accept_client(self) -> Tuple[socket.socket, Tuple[str, int]]:
+        Accepts a new client connection and returns the connected socket and the client address.
+    Server.serve(self, client_socket: socket.socket) -> None:
+        Handles data transmission for the client connection.
+    Server.start(self) -> None:
+        Starts the server and continuously accepts and serves client connections.
+
+Attributes:
+    HOST (str): Symbolic name meaning all available interfaces.
+    PORT (int): Arbitrary non-privileged port.
 """
 
 import socket
@@ -27,7 +47,7 @@ class Server:
         except OSError as e:
             print(f"Error starting server: {e}")
             self.server_socket.close()
-    
+
     def accept_client(self) -> Tuple[socket.socket, Tuple[str, int]]:
         """
         Accept a new client connection.
@@ -44,7 +64,7 @@ class Server:
         except Exception as e:
             print(f"Unexpected error: {e}")
             raise
-    
+
     def serve(self, client_socket: socket.socket) -> None:
         """
         Serve a client connection.
@@ -57,13 +77,13 @@ class Server:
                 if not data:
                     break
                 print(f"Received: {data}")
-                message = "OK" 
+                message = "OK"
                 client_socket.sendall(message.encode())
         except socket.error as e:
             print(f"Error serving client: {e}")
         finally:
             client_socket.close()
-    
+
     def start(self) -> None:
         """
         Start the server.
@@ -76,7 +96,6 @@ class Server:
             print("Server stopped")
         finally:
             self.server_socket.close()
-
 
 # HOST = socket.gethostname()  # Make socket visible to outside world
 # HOST = "localhost"  # or "127.0.0.1" visible only within same machine
